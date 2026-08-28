@@ -1,0 +1,6 @@
+name = "telegram-bot"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+BOT_TOKEN = "8924768769:AAHspBsqCYfeFmVo4lvDxg5QoWijSF5w2XE"
