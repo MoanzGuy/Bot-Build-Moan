@@ -1,0 +1,63 @@
+name: Build Flutter APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'projects/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+
+      - name: Find Project ZIP
+        id: find_zip
+        run: |
+          ZIP=$(find projects/ -name "*.zip" | head -1)
+          echo "zip_path=$ZIP" >> $GITHUB_OUTPUT
+          PROJECT=$(basename $(dirname $ZIP))
+          echo "project_name=$PROJECT" >> $GITHUB_OUTPUT
+
+      - name: Extract ZIP
+        run: |
+          mkdir -p build_src
+          unzip "${{ steps.find_zip.outputs.zip_path }}" -d build_src/
+
+      - name: Flutter Dependencies
+        working-directory: build_src
+        run: flutter pub get
+
+      - name: Build APK Release
+        working-directory: build_src
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.find_zip.outputs.project_name }}-release
+          path: build_src/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
+
+      - name: Send APK to Telegram
+        run: |
+          APK_PATH="build_src/build/app/outputs/flutter-apk/app-release.apk"
+          curl -F "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+               -F "document=@$APK_PATH" \
+               -F "caption=✅ Build Selesai — ${{ steps.find_zip.outputs.project_name }}" \
+               "https://api.telegram.org/bot${{ secrets.BOT_TOKEN }}/sendDocument"
